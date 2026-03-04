@@ -169,6 +169,12 @@ def get_csrf_token(auth_token: str) -> str:
         session.cookies.set("auth_token", auth_token, domain=".twitter.com")
         session.get(
             "https://twitter.com/i/api/2/badge_count/badge_count.json",
+            headers={
+                "authorization": "Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LTMQLSrdih0K0j6TSADAOkOzqytqPexPjEsxHfCTZO",
+                "x-twitter-active-user": "yes",
+                "x-twitter-auth-type": "OAuth2Session",
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+            },
             timeout=10,
         )
         ct0 = session.cookies.get("ct0") or ""
@@ -176,7 +182,8 @@ def get_csrf_token(auth_token: str) -> str:
             return ct0
     except Exception:
         pass
-    return "".join(random.choices("0123456789abcdef", k=32))
+    import secrets
+    return secrets.token_hex(32)
 
 
 def build_headers(auth_token: str, csrf_token: str) -> dict:
@@ -193,8 +200,8 @@ def build_headers(auth_token: str, csrf_token: str) -> dict:
     }
 
 
-def search_tweets(query: str, auth_token: str, max_results: int = 20) -> list:
-    csrf = get_csrf_token(auth_token)
+def search_tweets(query: str, auth_token: str, max_results: int = 20, ct0: str = "") -> list:
+    csrf = ct0 if ct0 else get_csrf_token(auth_token)
     headers = build_headers(auth_token, csrf)
 
     variables = {
@@ -235,11 +242,10 @@ def search_tweets(query: str, auth_token: str, max_results: int = 20) -> list:
         resp.raise_for_status()
         return _parse_tweets(resp.json())
     except requests.exceptions.HTTPError as e:
-        code = e.response.status_code if e.response else 0
-        if code == 401:
-            raise ValueError("Auth token tidak valid atau sudah kedaluwarsa.")
-        elif code == 403:
-            raise ValueError("Akses ditolak Twitter. Pastikan auth_token masih aktif.")
+        code = e.response.status_code if getattr(e, 'response', None) is not None else 0
+        if code in [401, 403, 400]:
+            print(f"Auth token block (Code {code}). Menggunakan Fallback Scraper Nitter...")
+            return _fallback_scrape(query, max_results)
         elif code == 429:
             raise ValueError("Rate limit Twitter. Coba lagi beberapa menit kemudian.")
         raise ValueError(f"HTTP Error {code}: {str(e)}")
@@ -247,6 +253,91 @@ def search_tweets(query: str, auth_token: str, max_results: int = 20) -> list:
         raise ValueError("Request timeout. Periksa koneksi internet Anda.")
     except Exception as e:
         raise ValueError(f"Gagal mengambil data: {str(e)}")
+
+import urllib.parse
+from bs4 import BeautifulSoup
+import json
+
+def _fallback_scrape(query: str, max_results: int) -> list:
+    """Fallback scraping ke Twitter Syndication API (tanpa auth_token).
+    Catatan: Syndication biasa berbasis profile/user. Jika query berupa keyword, 
+    kita ambil keyword pertama sbg 'user' asumsi. Ini adalah best-effort fallback.
+    """
+    # Ambil kata pertama tanpa hashtag/simbol sebagai target profile
+    clean_query = ''.join(e for e in query.split()[0] if e.isalnum())
+    if not clean_query:
+        clean_query = "twitter"
+        
+    url = f"https://syndication.twitter.com/srv/timeline-profile/screen-name/{clean_query}"
+    
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
+    }
+    
+    try:
+        resp = requests.get(url, headers=headers, timeout=15)
+        resp.raise_for_status()
+        
+        # Syndication mengembalikan HTML dengan tag <script id="__NEXT_DATA__"> berisi JSON data
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        script_tag = soup.find('script', id='__NEXT_DATA__')
+        
+        if not script_tag:
+            raise ValueError("Struktur data Syndication berubah.")
+            
+        data = json.loads(script_tag.string)
+        instructions = (
+            data.get("props", {})
+            .get("pageProps", {})
+            .get("timeline", {})
+            .get("entries", [])
+        )
+        
+        tweets = []
+        for entry in instructions:
+            if len(tweets) >= max_results:
+                break
+                
+            if entry.get("type") != "tweet":
+                continue
+                
+            tweet_data = entry.get("content", {}).get("tweet", {})
+            if not tweet_data:
+                continue
+                
+            text = tweet_data.get("text", "")
+            if not text:
+                continue
+                
+            user_data = tweet_data.get("user", {})
+            
+            tw = {
+                "id": tweet_data.get("id_str", str(hash(text))),
+                "text": text,
+                "created_at": tweet_data.get("created_at", ""),
+                "retweet_count": tweet_data.get("retweet_count", 0),
+                "like_count": tweet_data.get("favorite_count", 0),
+                "reply_count": tweet_data.get("reply_count", 0),
+                "quote_count": tweet_data.get("quote_count", 0),
+                "user": {
+                    "name": user_data.get("name", "Unknown"),
+                    "screen_name": user_data.get("screen_name", "unknown"),
+                    "followers": user_data.get("followers_count", 0),
+                    "profile_image": user_data.get("profile_image_url_https", ""),
+                },
+            }
+            tweets.append(tw)
+            
+        return tweets
+    except requests.exceptions.HTTPError as e:
+        code = e.response.status_code if getattr(e, 'response', None) is not None else 0
+        if code == 404:
+             return [] # User/Topik tidak ditemukan
+        print(f"Fallback Syndication HTTP Error: {e}")
+        raise ValueError(f"Gagal memuat fallback (API Utama 401 & Syndication {code}). Pastikan auth_token valid.")
+    except Exception as e:
+        print(f"Fallback Syndication Error: {e}")
+        raise ValueError(f"Gagal mengambil data dari API Utama & Scraper Cadangan. ({e})")
 
 
 def _parse_tweets(data: dict) -> list:
@@ -318,116 +409,14 @@ def _extract_tweet(result: dict) -> dict | None:
 def index():
     return send_file(os.path.join(os.path.dirname(__file__), "index.html"))
 
-
-@app.route("/get-token", methods=["GET"])
-def get_token():
-    """Ambil auth_token Twitter dari cookies browser lokal (Chrome/Firefox)."""
-    import browser_cookie3
-
-    browsers = [
-        ("Chrome",  browser_cookie3.chrome),
-        ("Firefox", browser_cookie3.firefox),
-        ("Edge",    browser_cookie3.edge),
-    ]
-
-    for name, fn in browsers:
-        try:
-            jar = fn(domain_name=".twitter.com")
-            token = next(
-                (c.value for c in jar
-                 if c.name == "auth_token" and "twitter.com" in (c.domain or "")),
-                None,
-            )
-            if token:
-                return jsonify({"token": token, "browser": name})
-        except Exception:
-            continue
-
-    # Coba domain x.com juga
-    for name, fn in browsers:
-        try:
-            jar = fn(domain_name=".x.com")
-            token = next(
-                (c.value for c in jar if c.name == "auth_token"),
-                None,
-            )
-            if token:
-                return jsonify({"token": token, "browser": name})
-        except Exception:
-            continue
-
-    return jsonify({
-        "error": "Auth token tidak ditemukan. Pastikan kamu sudah login di Twitter/X di Chrome, Firefox, atau Edge, lalu coba lagi."
-    }), 404
-
-
-
-@app.route("/login-twitter", methods=["GET"])
-def login_twitter():
-    """
-    Buka browser Chromium nyata → arahkan ke halaman login Twitter →
-    tunggu user selesai login → ambil auth_token otomatis → tutup browser.
-    """
-    import threading
-
-    result_holder = {}
-    done_event    = threading.Event()
-
-    def run_playwright():
-        try:
-            from playwright.sync_api import sync_playwright
-            with sync_playwright() as p:
-                print("🚀 Membuka browser Playwright...")
-                browser = p.chromium.launch(headless=False, args=["--start-maximized"])
-                ctx     = browser.new_context(no_viewport=True)
-                page    = ctx.new_page()
-                page.goto("https://x.com/login", timeout=30_000)
-
-                # Poll sampai auth_token muncul (maks 5 menit)
-                for _ in range(300):
-                    try:
-                        cookies = ctx.cookies(["https://x.com", "https://twitter.com"])
-                        token   = next((c["value"] for c in cookies if c["name"] == "auth_token"), None)
-                        if token:
-                            result_holder["token"] = token
-                            print("✅ Auth token ditemukan!")
-                            break
-                    except Exception:
-                        pass
-                    import time; time.sleep(1)
-
-                browser.close()
-        except Exception as e:
-            print(f"❌ Playwright Error: {e}")
-            result_holder["error"] = str(e)
-        finally:
-            done_event.set()
-
-    t = threading.Thread(target=run_playwright, daemon=True)
-    t.start()
-    
-    # Tunggu thread selesai atau timeout
-    is_finished = done_event.wait(timeout=310)
-    
-    if not is_finished:
-        return jsonify({"error": "Login timeout (5 menit). Silakan coba lagi."}), 408
-    
-    if "error" in result_holder:
-        return jsonify({"error": f"Gagal membuka browser: {result_holder['error']}. Pastikan sudah menjalankan 'playwright install chromium'."}), 500
-
-    token = result_holder.get("token")
-    if token:
-        return jsonify({"token": token})
-    
-    return jsonify({"error": "Login dibatalkan atau token tidak ditemukan."}), 404
-
-
+# ── Endpoints auto-token / Playwright dihilangkan karena aplikasi berjalan di Web ──
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
     data         = request.get_json()
     query        = (data.get("query") or "").strip()
     auth_token   = (data.get("auth_token") or "").strip()
+    ct0          = (data.get("ct0") or "").strip()
     max_results  = min(int(data.get("max_results", 20)), 50)
     translate_to = data.get("translate_to", "id")
 
@@ -437,7 +426,7 @@ def analyze():
         return jsonify({"error": "Auth token tidak boleh kosong."}), 400
 
     try:
-        raw_tweets = search_tweets(query, auth_token, max_results)
+        raw_tweets = search_tweets(query, auth_token, max_results, ct0=ct0)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 

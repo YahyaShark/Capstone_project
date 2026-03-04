@@ -62,12 +62,13 @@
 
             <div class="how-to">
                 <details>
-                    <summary>📖 Cara mendapatkan <code>auth_token</code></summary>
+                    <summary>📖 Cara mendapatkan <code>auth_token</code> & <code>ct0</code></summary>
                     <ol>
                         <li>Buka <a href="https://twitter.com" target="_blank">twitter.com</a> dan login</li>
                         <li>Tekan <kbd>F12</kbd> → tab <strong>Application</strong></li>
                         <li>Panel kiri: <strong>Cookies</strong> → <code>https://twitter.com</code></li>
-                        <li>Cari baris <code>auth_token</code> → salin nilai <strong>Value</strong>-nya</li>
+                        <li>Cari baris <code>auth_token</code> dan salin <strong>Value</strong>-nya</li>
+                        <li>Cari juga baris <code>ct0</code> dan salin <strong>Value</strong>-nya</li>
                     </ol>
                 </details>
             </div>
@@ -86,18 +87,22 @@
                         <label for="auth_token">🔑 Twitter Auth Token</label>
                         <div class="input-with-toggle">
                             <input type="password" id="auth_token" name="auth_token"
-                                placeholder="Paste auth_token atau klik Ambil Otomatis…" />
-                            <button type="button" class="toggle-vis" id="toggleBtn" onclick="toggleVis()"
+                                placeholder="Paste auth_token di sini" />
+                            <button type="button" class="toggle-vis" id="toggleBtnAuth"
+                                onclick="toggleVis('auth_token')" title="Tampilkan/Sembunyikan">👁️</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label for="ct0">🛡️ Twitter CSRF Token (ct0)</label>
+                        <div class="input-with-toggle">
+                            <input type="password" id="ct0" name="ct0"
+                                placeholder="Paste csrf token (ct0) di sini (Opsional)" />
+                            <button type="button" class="toggle-vis" id="toggleBtnCt0" onclick="toggleVis('ct0')"
                                 title="Tampilkan/Sembunyikan">👁️</button>
                         </div>
-                        <div class="token-actions">
-                            <button type="button" class="btn-auto-token" id="autoTokenBtn" onclick="fetchToken()">
-                                🐦 Login Twitter & Ambil Token
-                            </button>
-                            <span id="tokenStatus" class="token-status"></span>
-                        </div>
-                        <span class="field-hint">Token hanya digunakan untuk mengambil data dari Twitter — tidak
-                            disimpan</span>
+                        <span class="field-hint">Opsional, tapi <strong>Sangat Disarankan</strong>. Jika kosong, sistem
+                            akan mencoba memancingnya secara otomatis (bisa gagal di server Web).</span>
                     </div>
 
                     <div class="form-group">
