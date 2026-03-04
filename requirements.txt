@@ -2,7 +2,5 @@ flask
 requests
 langdetect
 deep-translator
-transformers
-torch
 browser-cookie3
 playwright
