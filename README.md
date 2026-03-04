@@ -1,17 +1,17 @@
 # 💬 SentiDetect X — Twitter/X Sentiment Intelligence
 
-**SentiDetect X** adalah aplikasi berbasis web untuk menganalisis sentimen komentar di Twitter/X secara real-time. Fokus utama aplikasi ini adalah mengidentifikasi dan mengelompokkan komentar **Negatif** atau **Sangat Negatif** ke dalam kategori "Buzzer Negatif".
+**SentiDetect X** adalah aplikasi berbasis web untuk menganalisis sentimen komentar di Twitter/X secara real-time. Fokus utama aplikasi ini adalah mengidentifikasi dan mengelompokkan komentar **Negatif** atau **Sangat Negatif** ke dalam kategori "Buzzer Negatif". Aplikasi ini dirancang agar **100% siap di-deploy (Web/Cloud Ready)** dengan ketahanan terhadap pemblokiran sesi.
 
 ---
 
 ## ✨ Fitur Utama
 
 - 🤖 **AI-Powered Sentiment**: Menggunakan model HuggingFace `twitter-xlm-roberta-base-sentiment` untuk akurasi tinggi dan dukungan multibahasa (termasuk Indonesia).
-- 🐦 **Auto Token Capture**: Fitur otomatisasi Playwright untuk mengambil `auth_token` Twitter langsung setelah login di browser.
+- 🛡️ **Anti-Block Web Fallback**: Dilengkapi dengan sistem *Fallback Scraper* menggunakan Syndication API. Jika token utama ditolak oleh Twitter karena perbedaan IP server Cloud, aplikasi akan **otomatis** beralih ke jalur alternatif publik tanpa error (Anti-crash HTTP 401/403).
 - 🚨 **Buzzer Negatif Detection**: Klasifikasi khusus untuk komentar negatif yang berpotensi menjadi buzzer.
 - 🌐 **Multilingual & Translation**: Deteksi bahasa otomatis dan terjemahan ke Bahasa Indonesia atau Inggris.
-- 📊 **Interactive Dashboard**: Ringkasan statistik, chart sentimen, dan filter hasil analisis.
-- 🌑 **Simple Dark UI**: Tampilan minimalis yang bersih, cepat, dan mudah dibaca.
+- 📊 **Interactive Dashboard**: Ringkasan statistik, chart sentimen, dan filter interaktif hasil analisis.
+- 🌑 **Simple Dark UI**: Tampilan minimalis yang modern, responsif, cepat, dan mudah dibaca.
 
 ---
 
@@ -19,9 +19,9 @@
 
 - **Backend**: Python (Flask)
 - **Frontend**: HTML5, Vanilla CSS3, JavaScript (ES6+)
-- **AI/ML**: `transformers` (HuggingFace), `torch`
-- **Automation**: `playwright` (untuk auto-capture token)
-- **Data Scraping**: Twitter API (Unofficial via `auth_token`)
+- **AI/ML API**: HuggingFace Inference API (`requests`)
+- **Data Scraping Utama**: Twitter GraphQL (via manual `auth_token` & `ct0`)
+- **Data Scraping Cadangan**: Twitter Syndication API (Fallback Web) & BeautifulSoup4
 
 ---
 
@@ -32,40 +32,43 @@ Pastikan Anda sudah menginstal **Python 3.8+** di komputer Anda.
 
 ### 2. Clone atau Download Project
 Buka terminal dan masuk ke folder project:
-```powershell
+```shell
 cd project_1
 ```
 
 ### 3. Instalasi Dependency
 Instal library yang dibutuhkan menggunakan pip:
-```powershell
+```shell
 pip install -r requirements.txt
-```
-
-### 4. Setup Browser Automation (Playwright)
-Agar fitur login otomatis berfungsi, instal driver browser Chromium:
-```powershell
-python -m playwright install chromium
 ```
 
 ---
 
-## 📖 Cara Penggunaan
+## 📖 Cara Penggunaan & Pengoperasian
 
-1. **Jalankan Aplikasi**:
-   ```powershell
+Aplikasi ini mengandalkan Token Autentikasi yang diisi secara manual, sehingga cocok dan aman saat di-_hosting_ di server manapun.
+
+### Langkah 1: Jalankan Aplikasi
+1. Jalankan server Flask lokal Anda:
+   ```shell
    python app.py
    ```
-2. **Buka di Browser**:
-   Masuk ke [http://localhost:5000](http://localhost:5000).
-3. **Ambil Auth Token**:
-   - Klik tombol **🐦 Login Twitter & Ambil Token**.
-   - Sebuah browser Chrome akan terbuka. Silakan login ke akun Twitter/X Anda.
-   - Setelah login berhasil, browser akan tertutup otomatis dan token akan terisi di form.
-4. **Analisis**:
-   - Masukkan topik atau hashtag (contoh: `#KneztVsSeablings`).
-   - Tentukan jumlah tweet yang ingin diambil (maks 50).
-   - Klik **Mulai Analisis Sentimen**.
+2. Buka Browser dan kunjungi `http://localhost:5000` (atau URL Vercel/Render Anda jika sudah di-deploy).
+
+### Langkah 2: Ambil Token Akses `auth_token` & `ct0`
+Anda perlu token dari akun Twitter pribadi Anda agar pencarian data tidak dibatasi:
+1. Buka [https://twitter.com](https://twitter.com) di tab baru dan **Login** ke akun Anda.
+2. Tekan tombol `F12` di keyboard untuk membuka mode **Developer Tools** (Inspect Element).
+3. Buka tab **Application** (Chrome/Edge) atau **Storage** (Firefox).
+4. Di panel kiri, cari bagian **Cookies** lalu klik `https://twitter.com`.
+5. Temukan baris dengan nama `auth_token` dan salin (copy) isinya ke kolom **Twitter Auth Token** di website SentiDetect X.
+6. Opsional tapi sangat disarankan: Temukan juga baris dengan nama `ct0` dan salin isinya ke kolom **Twitter CSRF Token (ct0)** di SentiDetect X.
+
+### Langkah 3: Mulai Analisis
+1. Di halaman SentiDetect X, masukkan kata kunci atau tagar yang ingin Anda analisis pada kolom "🔎 Topik / Hashtag".
+2. Tentukan jumlah tweet maksimal yang ingin dianalisis (maks. 50).
+3. Tekan tombol **🚀 Mulai Analisis Sentimen**.
+4. Tunggu beberapa detik, analisis dan chart akan muncul di dashboard. Jika token utama memblokir trafik (misal karena IP cloud), SentiDetect X akan otomatis menggunakan mode cadangan anti-error!
 
 ---
 
@@ -73,17 +76,16 @@ python -m playwright install chromium
 
 ```text
 project_1/
-├── app.py              # Backend Flask & Logika AI
-├── index.html          # Frontend utama (Root)
-├── requirements.txt    # Daftar library Python
+├── app.py              # Backend Flask (Routing & Scraper & AI Call)
+├── index.html          # Frontend utama (Antarmuka Utama)
+├── requirements.txt    # Daftar library Python (Flask, requests, bs4, dsb)
 ├── README.md           # Dokumentasi ini
-├── static/             # Assets statis
-│   ├── css/style.css   # Styling (Simple Dark Theme)
-│   └── js/main.js      # Logika interaksi frontend
-└── task.md             # Catatan progres pengerjaan
+└── static/             # Assets statis website
+    ├── css/style.css   # Styling (Simple Dark Theme)
+    └── js/main.js      # Logika interaksi frontend (DOM/Fetch)
 ```
 
 ---
 
 ## ⚖️ Disclaimer
-*Aplikasi ini dibuat untuk tujuan edukasi dan penelitian (Capstone Project). Penggunaan `auth_token` dilakukan secara lokal di komputer pengguna dan tidak disimpan oleh sistem.*
+*Aplikasi ini dibuat untuk tujuan edukasi dan penelitian (Capstone Project). Token hanya disalurkan sementara di sisi server (RAM) untuk mengambil data saat diperlukan dan **sama sekali tidak disimpan ke database/file apapun**.*
