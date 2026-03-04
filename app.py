@@ -8,27 +8,26 @@ import random
 from datetime import datetime, timezone
 from langdetect import detect, LangDetectException
 from deep_translator import GoogleTranslator
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ─────────────────────────────────────────────
-#  HUGGINGFACE SENTIMENT MODEL (load once)
+#  HUGGINGFACE SENTIMENT MODEL (via Inference API)
 # ─────────────────────────────────────────────
-print("⏳ Memuat model sentimen HuggingFace... (download otomatis jika pertama kali)")
-from transformers import pipeline as hf_pipeline
-
+HF_TOKEN = os.getenv("HF_TOKEN")
 SENTIMENT_MODEL = "cardiffnlp/twitter-xlm-roberta-base-sentiment"
+API_URL = f"https://api-inference.huggingface.co/models/{SENTIMENT_MODEL}"
+HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"}
 
-try:
-    _classifier = hf_pipeline(
-        "sentiment-analysis",
-        model=SENTIMENT_MODEL,
-        tokenizer=SENTIMENT_MODEL,
-        max_length=512,
-        truncation=True,
-    )
-    print("✅ Model sentimen berhasil dimuat!")
-except Exception as e:
-    _classifier = None
-    print(f"⚠️  Gagal memuat model: {e}")
+def query_hf_api(text: str):
+    """Kirim request ke Hugging Face Inference API."""
+    try:
+        response = requests.post(API_URL, headers=HEADERS, json={"inputs": text}, timeout=10)
+        return response.json()
+    except Exception as e:
+        print(f"API Error: {e}")
+        return None
 
 # ─────────────────────────────────────────────
 #  LABEL HELPERS
@@ -70,20 +69,22 @@ def translate_text(text: str, target: str = "en") -> str:
 
 def classify_sentiment(text: str) -> dict:
     """
-    Classify sentiment using HuggingFace twitter-xlm-roberta model.
-    Falls back to keyword-based if model unavailable.
-    Returns:
-      label   : 'Sangat Negatif' | 'Negatif' | 'Netral' | 'Positif'
-      level   : 3 | 2 | 1 | 0
-      score   : float confidence 0-1
-      neg_keywords: [] (empty — model-based, no keyword extraction)
-      pos_keywords: []
+    Classify sentiment using HuggingFace twitter-xlm-roberta model via API.
+    Falls back to keyword-based if API fails.
     """
-    if _classifier is None:
+    api_result = query_hf_api(text[:512])
+
+    # API result is usually a list of lists: [[{'label': '...', 'score': ...}, ...]]
+    if not api_result or not isinstance(api_result, list) or "error" in api_result:
+        print(f"API result error or empty: {api_result}, fallback to keyword")
         return _fallback_classify(text)
 
     try:
-        result = _classifier(text[:512])[0]
+        # Get the highest score result
+        result = api_result[0]
+        if isinstance(result, list):
+            result = result[0]
+
         raw_label = result["label"].lower()   # "negative", "neutral", "positive"
         score     = round(result["score"], 4)
 
@@ -105,11 +106,11 @@ def classify_sentiment(text: str) -> dict:
             "neg_keywords": [],
             "pos_keywords": [],
             "neg_count":    0,
-            "model":        "xlm-roberta",
+            "model":        "xlm-roberta-api",
         }
 
-    except Exception as e:
-        print(f"Model inference error: {e}, fallback to keyword")
+    except (KeyError, IndexError) as e:
+        print(f"Model parsing error: {e}, fallback to keyword")
         return _fallback_classify(text)
 
 
@@ -373,36 +374,52 @@ def login_twitter():
     done_event    = threading.Event()
 
     def run_playwright():
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=False, args=["--start-maximized"])
-            ctx     = browser.new_context(no_viewport=True)
-            page    = ctx.new_page()
-            page.goto("https://x.com/login", timeout=30_000)
+        try:
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as p:
+                print("🚀 Membuka browser Playwright...")
+                browser = p.chromium.launch(headless=False, args=["--start-maximized"])
+                ctx     = browser.new_context(no_viewport=True)
+                page    = ctx.new_page()
+                page.goto("https://x.com/login", timeout=30_000)
 
-            # Poll sampai auth_token muncul (maks 5 menit)
-            for _ in range(300):
-                try:
-                    cookies = ctx.cookies(["https://x.com", "https://twitter.com"])
-                    token   = next((c["value"] for c in cookies if c["name"] == "auth_token"), None)
-                    if token:
-                        result_holder["token"] = token
-                        break
-                except Exception:
-                    pass
-                import time; time.sleep(1)
+                # Poll sampai auth_token muncul (maks 5 menit)
+                for _ in range(300):
+                    try:
+                        cookies = ctx.cookies(["https://x.com", "https://twitter.com"])
+                        token   = next((c["value"] for c in cookies if c["name"] == "auth_token"), None)
+                        if token:
+                            result_holder["token"] = token
+                            print("✅ Auth token ditemukan!")
+                            break
+                    except Exception:
+                        pass
+                    import time; time.sleep(1)
 
-            browser.close()
+                browser.close()
+        except Exception as e:
+            print(f"❌ Playwright Error: {e}")
+            result_holder["error"] = str(e)
+        finally:
             done_event.set()
 
     t = threading.Thread(target=run_playwright, daemon=True)
     t.start()
-    done_event.wait(timeout=310)
+    
+    # Tunggu thread selesai atau timeout
+    is_finished = done_event.wait(timeout=310)
+    
+    if not is_finished:
+        return jsonify({"error": "Login timeout (5 menit). Silakan coba lagi."}), 408
+    
+    if "error" in result_holder:
+        return jsonify({"error": f"Gagal membuka browser: {result_holder['error']}. Pastikan sudah menjalankan 'playwright install chromium'."}), 500
 
     token = result_holder.get("token")
     if token:
         return jsonify({"token": token})
-    return jsonify({"error": "Login timeout atau dibatalkan. Silakan coba lagi."}), 408
+    
+    return jsonify({"error": "Login dibatalkan atau token tidak ditemukan."}), 404
 
 
 
