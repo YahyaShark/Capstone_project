@@ -5,6 +5,7 @@
 "use strict";
 
 let allResults = [];
+let _ct0 = ""; // CSRF token Twitter, diambil bersama auth_token
 
 const form = document.getElementById("analyzeForm");
 const submitBtn = document.getElementById("submitBtn");
@@ -27,48 +28,13 @@ function showError(msg) {
 function clearError() { hide(errorBanner); errorBanner.innerHTML = ""; }
 
 // ── Toggle password ────────────────────────────────────────
-function toggleVis() {
-    const inp = document.getElementById("auth_token");
-    inp.type = inp.type === "password" ? "text" : "password";
+function toggleVis(id) {
+    const inp = document.getElementById(id || "auth_token");
+    if (inp) inp.type = inp.type === "password" ? "text" : "password";
 }
 
-// ── Login Twitter & ambil token otomatis ────────────────────
-async function fetchToken() {
-    const btn = document.getElementById("autoTokenBtn");
-    const status = document.getElementById("tokenStatus");
-
-    btn.disabled = true;
-    btn.textContent = "⏳ Menunggu login…";
-    status.textContent = "🌐 Browser dibuka — silakan login ke Twitter/X, token akan terdeteksi otomatis…";
-    status.className = "token-status";
-
-    try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 315_000);
-
-        const res = await fetch("/login-twitter", { signal: controller.signal });
-        clearTimeout(timer);
-        const data = await res.json();
-
-        if (data.token) {
-            document.getElementById("auth_token").value = data.token;
-            document.getElementById("auth_token").type = "text";
-            status.textContent = "✅ Login berhasil! Token otomatis terisi.";
-            status.className = "token-status ok";
-        } else {
-            status.textContent = data.error || "Token tidak ditemukan.";
-            status.className = "token-status fail";
-        }
-    } catch (err) {
-        status.textContent = err.name === "AbortError"
-            ? "⏰ Timeout — silakan coba lagi."
-            : "❌ Gagal terhubung ke server Flask.";
-        status.className = "token-status fail";
-    } finally {
-        btn.disabled = false;
-        btn.textContent = "🐦 Login Twitter & Ambil Token";
-    }
-}
+// ── Tombol otomatis dihilangkan karena lingkungan deployment (Web/Cloud)
+// ── Pengguna diwajibkan menggunakan token manual.
 
 // ── Submit ─────────────────────────────────────────────────
 form.addEventListener("submit", async (e) => {
@@ -77,6 +43,8 @@ form.addEventListener("submit", async (e) => {
 
     const query = document.getElementById("query").value.trim();
     const auth_token = document.getElementById("auth_token").value.trim();
+    const ct0Input = document.getElementById("ct0");
+    const ct0_val = ct0Input && ct0Input.value.trim() ? ct0Input.value.trim() : _ct0;
     const max_results = parseInt(document.getElementById("max_results").value) || 20;
     const translate_to = document.getElementById("translate_to").value;
 
@@ -95,19 +63,19 @@ form.addEventListener("submit", async (e) => {
         const res = await fetch("/analyze", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ query, auth_token, max_results, translate_to }),
+            body: JSON.stringify({ query, auth_token, ct0: ct0_val, max_results, translate_to }),
         });
         const data = await res.json();
 
         if (!res.ok || data.error) { showError(data.error || "Terjadi kesalahan."); return; }
-        if (!data.tweets?.length) { showError("Tidak ada tweet ditemukan. Coba topik lain atau periksa auth_token."); return; }
+        if (!data.tweets?.length) { showError("Tidak ada tweet ditemukan. Coba topik lain atau periksa auth_token & ct0."); return; }
 
         allResults = data.tweets;
         renderSummary(data.summary, data.tweets.length);
         renderTweets(allResults);
 
     } catch {
-        showError("❌ Gagal terhubung ke server. Pastikan Flask sedang berjalan.");
+        showError("❌ Gagal terhubung ke server. Pastikan koneksi internet stabil atau coba memuat ulang halaman.");
     } finally {
         hide(loading);
         submitBtn.disabled = false;

@@ -916,6 +916,24 @@ body {
   cursor: not-allowed;
 }
 
+.btn-playwright {
+  background: rgba(29, 155, 240, .12);
+  border-color: rgba(29, 155, 240, .3);
+  color: #60c8ff;
+}
+
+.btn-playwright:hover {
+  background: rgba(29, 155, 240, .22);
+}
+
+.token-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
 .token-status {
   font-size: .8rem;
 }
