@@ -8,11 +8,14 @@ import random
 from datetime import datetime, timezone
 from langdetect import detect, LangDetectException
 from deep_translator import GoogleTranslator
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ─────────────────────────────────────────────
 #  HUGGINGFACE SENTIMENT MODEL (via Inference API)
 # ─────────────────────────────────────────────
-HF_TOKEN = "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"
+HF_TOKEN = os.getenv("HF_TOKEN")
 SENTIMENT_MODEL = "cardiffnlp/twitter-xlm-roberta-base-sentiment"
 API_URL = f"https://api-inference.huggingface.co/models/{SENTIMENT_MODEL}"
 HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"}

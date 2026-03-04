@@ -4,3 +4,4 @@ langdetect
 deep-translator
 browser-cookie3
 playwright
+python-dotenv
