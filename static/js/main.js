@@ -5,7 +5,6 @@
 "use strict";
 
 let allResults = [];
-let _ct0 = ""; // CSRF token Twitter, diambil bersama auth_token
 
 const form = document.getElementById("analyzeForm");
 const submitBtn = document.getElementById("submitBtn");
