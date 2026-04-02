@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SentiDetect X — Deteksi Buzzer Negatif Twitter/X</title>
     <meta name="description"
-        content="Analisis dan klasifikasi komentar negatif dari Twitter/X. Komentar negatif akan dicap sebagai Buzzer Negatif. Mendukung multibahasa dengan terjemahan otomatis." />
+        content="Analisis dan klasifikasi komentar negatif dari Twitter/X. Komentar negatif akan dicap sebagai Buzzer Negatif." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -43,7 +43,6 @@
                     Analisis komentar secara real-time — komentar <strong>Negatif</strong> atau <strong>Sangat
                         Negatif</strong>
                     akan dicap sebagai <span class="hero-tag buzzer">🔴 Buzzer Negatif</span>.
-                    Mendukung <strong>multibahasa</strong> dengan terjemahan otomatis.
                     Dioptimalkan untuk isu viral seperti <em>#KneztVsSeablings</em>.
                 </p>
             </div>
@@ -93,30 +92,12 @@
                         </div>
                     </div>
 
-                    <div class="form-group full-width">
-                        <label for="ct0">🛡️ Twitter CSRF Token (ct0)</label>
-                        <div class="input-with-toggle">
-                            <input type="password" id="ct0" name="ct0"
-                                placeholder="Paste csrf token (ct0) di sini (Opsional)" />
-                            <button type="button" class="toggle-vis" id="toggleBtnCt0" onclick="toggleVis('ct0')"
-                                title="Tampilkan/Sembunyikan">👁️</button>
-                        </div>
-                        <span class="field-hint">Opsional, tapi <strong>Sangat Disarankan</strong>. Jika kosong, sistem
-                            akan mencoba memancingnya secara otomatis (bisa gagal di server Web).</span>
-                    </div>
-
                     <div class="form-group">
                         <label for="max_results">📊 Jumlah Tweet (maks 50)</label>
                         <input type="number" id="max_results" name="max_results" value="20" min="5" max="50" />
                     </div>
 
-                    <div class="form-group">
-                        <label for="translate_to">🌐 Terjemahkan Komentar ke</label>
-                        <select id="translate_to" name="translate_to">
-                            <option value="id" selected>🇮🇩 Bahasa Indonesia</option>
-                            <option value="en">🇬🇧 English</option>
-                        </select>
-                    </div>
+
 
                 </div>
 
@@ -131,7 +112,6 @@
         <div id="loading" class="loading hidden">
             <div class="spinner"></div>
             <p>Mengambil &amp; menganalisis komentar…</p>
-            <small>Terjemahan multibahasa mungkin memakan beberapa detik</small>
         </div>
 
         <!-- ERROR -->
@@ -234,7 +214,7 @@
         <p>SentiDetect X &mdash; Analisis Sentimen Komentar Twitter/X &mdash; Capstone Project &copy; 2025</p>
     </footer>
 
-    <script src="/static/js/main.js"></script>
+    <script src="static/js/main.js?v=2"></script>
 </body>
 
 </html>
