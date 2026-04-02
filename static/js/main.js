@@ -43,13 +43,10 @@ form.addEventListener("submit", async (e) => {
 
     const query = document.getElementById("query").value.trim();
     const auth_token = document.getElementById("auth_token").value.trim();
-    const ct0Input = document.getElementById("ct0");
-    const ct0_val = ct0Input && ct0Input.value.trim() ? ct0Input.value.trim() : _ct0;
     const max_results = parseInt(document.getElementById("max_results").value) || 20;
-    const translate_to = document.getElementById("translate_to").value;
 
     if (!query) { showError("⚠️ Masukkan topik / hashtag yang ingin dianalisis."); return; }
-    if (!auth_token) { showError("⚠️ Auth token Twitter/X wajib diisi. Lihat panduan di atas."); return; }
+    if (!auth_token) { showError("⚠️ Auth token Twitter/X wajib diisi."); return; }
 
     hide(summarySection);
     hide(resultsSection);
@@ -63,7 +60,7 @@ form.addEventListener("submit", async (e) => {
         const res = await fetch("/analyze", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ query, auth_token, ct0: ct0_val, max_results, translate_to }),
+            body: JSON.stringify({ query, auth_token, max_results }),
         });
         const data = await res.json();
 
@@ -166,22 +163,14 @@ function buildCard(t, index) {
     ][lvl];
     const sentBadge = `<span class="badge ${sentInfo[1]}">${sentInfo[0]}</span>`;
 
-    // Language badge
-    const langBadge = `<span class="badge badge-lang">🌐 ${esc(t.lang.toUpperCase())}</span>`;
+
 
     // Confidence score badge (model-based only)
     const scoreBadge = t.sentiment.score != null
         ? `<span class="badge badge-score">${(t.sentiment.score * 100).toFixed(1)}% yakin</span>`
         : "";
 
-    // Translation block
-    const tgtLabel = t.translate_to === "en" ? "🇬🇧 English Translation" : "🇮🇩 Terjemahan Bahasa Indonesia";
-    const translationHtml = t.translated
-        ? `<div class="tc-translation">
-         <span class="tl-label">🔄 ${tgtLabel}</span>
-         ${esc(t.translated)}
-       </div>`
-        : "";
+
 
     // Highlight negative keywords in original text
     let highlightedText = esc(t.text);
@@ -204,16 +193,21 @@ function buildCard(t, index) {
     div.innerHTML = `
     <div class="tc-top">
       <div class="tc-user">
-        ${avatarHtml}
+        <a href="https://x.com/${esc(t.user.screen_name)}" target="_blank" title="Buka Profil Asli">
+          ${avatarHtml}
+        </a>
         <div>
-          <div class="tc-name">${esc(t.user.name)}</div>
-          <div class="tc-handle">@${esc(t.user.screen_name)}</div>
+          <div class="tc-name">
+            <a href="https://x.com/${esc(t.user.screen_name)}" target="_blank" style="text-decoration:none; color:inherit;">
+              ${esc(t.user.name)}
+            </a>
+          </div>
+          <div class="tc-handle">@${esc(t.user.screen_name)} • ${fmt(t.user.followers)} Followers</div>
         </div>
       </div>
       <div class="badges">
         ${buzzerBadge}
         ${sentBadge}
-        ${langBadge}
         ${scoreBadge}
       </div>
     </div>
@@ -221,7 +215,6 @@ function buildCard(t, index) {
     <div class="tc-text">${highlightedText}</div>
 
     ${kwHtml}
-    ${translationHtml}
 
     <div class="tc-metrics">
       <div class="metric"><span>🔁</span><span class="metric-val">${fmt(t.metrics.retweet_count)}</span>&nbsp;RT</div>
