@@ -30,17 +30,17 @@ def query_hf_api(text: str):
 # ─────────────────────────────────────────────
 #  LABEL HELPERS
 # ─────────────────────────────────────────────
-LABEL_SANGAT_NEGATIF = "Sangat Negatif"
-LABEL_NEGATIF        = "Negatif"
-LABEL_NETRAL         = "Netral"
-LABEL_POSITIF        = "Positif"
+LABEL_VERY_NEGATIVE = "Very Negative"
+LABEL_NEGATIVE      = "Negative"
+LABEL_NEUTRAL       = "Neutral"
+LABEL_POSITIVE      = "Positive"
 
 # Model output → label mapping
 # cardiffnlp labels: "negative" | "neutral" | "positive"
 MODEL_LABEL_MAP = {
-    "negative": ("neg", LABEL_NEGATIF),
-    "neutral":  ("netral", LABEL_NETRAL),
-    "positive": ("pos", LABEL_POSITIF),
+    "negative": ("neg", LABEL_NEGATIVE),
+    "neutral":  ("neutral", LABEL_NEUTRAL),
+    "positive": ("positive", LABEL_POSITIVE),
 }
 
 app = Flask(__name__)
@@ -63,7 +63,7 @@ def classify_sentiment(text: str) -> dict:
         # Jika API server down/gagal, kembalikan label Netral, jangan fallback mencari per kata.
         print(f"API result error or empty: {api_result}")
         return {
-            "label":        LABEL_NETRAL,
+            "label":        LABEL_NEUTRAL,
             "level":        1,
             "score":        0.0,
             "neg_keywords": [],
@@ -84,15 +84,15 @@ def classify_sentiment(text: str) -> dict:
             # KALIBRASI SENSITIVITAS (RE-TRAINING THRESHOLD)
             # Mengatasi bug model over-sensitive: jika dia merasa negatif tapi ragu (score di bawah 0.75), paksa menjadi Netral
             if score < 0.75:
-                label, level = LABEL_NETRAL, 1
+                label, level = LABEL_NEUTRAL, 1
             elif score >= 0.95:
-                label, level = LABEL_SANGAT_NEGATIF, 3
+                label, level = LABEL_VERY_NEGATIVE, 3
             else:
-                label, level = LABEL_NEGATIF, 2
+                label, level = LABEL_NEGATIVE, 2
         elif raw_label == "neutral":
-            label, level = LABEL_NETRAL, 1
+            label, level = LABEL_NEUTRAL, 1
         else:  # positive
-            label, level = LABEL_POSITIF, 0
+            label, level = LABEL_POSITIVE, 0
 
         return {
             "label":        label,
@@ -107,7 +107,7 @@ def classify_sentiment(text: str) -> dict:
     except (KeyError, IndexError) as e:
         print(f"Model parsing error: {e}")
         return {
-            "label":        LABEL_NETRAL,
+            "label":        LABEL_NEUTRAL,
             "level":        1,
             "score":        0.0,
             "neg_keywords": [],
@@ -140,7 +140,7 @@ def search_tweets(query: str, auth_token: str, max_results: int = 20) -> list:
         else:
             raise ValueError(f"{out.get('error')}")
     except json.JSONDecodeError:
-        raise ValueError(f"Sistem Gagal. Engine diblokir X.com atau timeout. Error logic: {res.stderr}")
+        raise ValueError(f"System Failed. Engine blocked by X.com or timed out. Error logic: {res.stderr}")
 
 
 # ─────────────────────────────────────────────
@@ -161,9 +161,9 @@ def analyze():
     max_results  = min(int(data.get("max_results", 20)), 50)
 
     if not query:
-        return jsonify({"error": "Query tidak boleh kosong."}), 400
+        return jsonify({"error": "Query cannot be empty."}), 400
     if not auth_token:
-        return jsonify({"error": "Auth token tidak boleh kosong."}), 400
+        return jsonify({"error": "Auth token cannot be empty."}), 400
 
     try:
         raw_tweets = search_tweets(query, auth_token, max_results)
@@ -172,7 +172,7 @@ def analyze():
 
     if not raw_tweets:
         return jsonify({
-            "error": "Tidak ada tweet ditemukan. Pastikan query benar dan auth_token valid.",
+            "error": "No tweets found. Please ensure the query is correct and the auth_token is valid.",
         }), 200
 
     results = []
@@ -197,15 +197,15 @@ def analyze():
     total          = len(results)
     very_neg_count = sum(1 for r in results if r["sentiment"]["level"] == 3)
     neg_count      = sum(1 for r in results if r["sentiment"]["level"] >= 2)
-    netral_count   = sum(1 for r in results if r["sentiment"]["level"] == 1)
-    positif_count  = sum(1 for r in results if r["sentiment"]["level"] == 0)
+    neutral_count   = sum(1 for r in results if r["sentiment"]["level"] == 1)
+    positive_count  = sum(1 for r in results if r["sentiment"]["level"] == 0)
 
     summary = {
         "total":          total,
         "very_neg_count": very_neg_count,
         "neg_count":      neg_count,
-        "netral_count":   netral_count,
-        "positif_count":  positif_count,
+        "neutral_count":   neutral_count,
+        "positive_count":  positive_count,
         "neg_pct":        round(neg_count / total * 100, 1) if total else 0,
         "very_neg_pct":   round(very_neg_count / total * 100, 1) if total else 0,
     }

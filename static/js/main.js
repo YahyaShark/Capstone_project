@@ -44,8 +44,8 @@ form.addEventListener("submit", async (e) => {
     const auth_token = document.getElementById("auth_token").value.trim();
     const max_results = parseInt(document.getElementById("max_results").value) || 20;
 
-    if (!query) { showError("⚠️ Masukkan topik / hashtag yang ingin dianalisis."); return; }
-    if (!auth_token) { showError("⚠️ Auth token Twitter/X wajib diisi."); return; }
+    if (!query) { showError("⚠️ Please enter a topic / hashtag to analyze."); return; }
+    if (!auth_token) { showError("⚠️ Twitter/X auth token is required."); return; }
 
     hide(summarySection);
     hide(resultsSection);
@@ -63,15 +63,15 @@ form.addEventListener("submit", async (e) => {
         });
         const data = await res.json();
 
-        if (!res.ok || data.error) { showError(data.error || "Terjadi kesalahan."); return; }
-        if (!data.tweets?.length) { showError("Tidak ada tweet ditemukan. Coba topik lain atau periksa auth_token & ct0."); return; }
+        if (!res.ok || data.error) { showError(data.error || "An error occurred."); return; }
+        if (!data.tweets?.length) { showError("No tweets found. Try another topic or check your auth_token & ct0."); return; }
 
         allResults = data.tweets;
         renderSummary(data.summary, data.tweets.length);
         renderTweets(allResults);
 
     } catch {
-        showError("❌ Gagal terhubung ke server. Pastikan koneksi internet stabil atau coba memuat ulang halaman.");
+        showError("❌ Failed to connect to server. Ensure your internet connection is stable or try reloading the page.");
     } finally {
         hide(loading);
         submitBtn.disabled = false;
@@ -81,29 +81,29 @@ form.addEventListener("submit", async (e) => {
 // ── Summary ────────────────────────────────────────────────
 function renderSummary(s, total) {
     setText("sv-total", total);
-    setText("sv-buzzer-neg", s.neg_count);          // all negative = buzzer negatif
+    setText("sv-buzzer-neg", s.neg_count);          // all negative = negative buzzer
     setText("sv-very-neg", s.very_neg_count);
     setText("sv-neg", s.neg_count - s.very_neg_count);
-    setText("sv-netral", s.netral_count);
-    setText("sv-positif", s.positif_count);
-    setText("sp-buzzer-neg", `${s.neg_pct}% dari total`);
-    setText("sp-very-neg", `${s.very_neg_pct}% dari total`);
-    setText("sp-neg", `${s.neg_pct}% dari total (termasuk sangat negatif)`);
+    setText("sv-neutral", s.neutral_count);
+    setText("sv-positive", s.positive_count);
+    setText("sp-buzzer-neg", `${s.neg_pct}%`);
+    setText("sp-very-neg", `${s.very_neg_pct}%`);
+    setText("sp-neg", `${s.neg_pct}% (includes very negative)`);
 
-    const netralPct = total ? Math.round(s.netral_count / total * 100) : 0;
-    const positifPct = total ? Math.round(s.positif_count / total * 100) : 0;
+    const neutralPct = total ? Math.round(s.neutral_count / total * 100) : 0;
+    const positivePct = total ? Math.round(s.positive_count / total * 100) : 0;
 
     requestAnimationFrame(() => setTimeout(() => {
         setWidth("pb-buzzer-neg", s.neg_pct);
         setWidth("pb-very-neg", s.very_neg_pct);
         setWidth("pb-neg", s.neg_pct - s.very_neg_pct);
-        setWidth("pb-netral", netralPct);
-        setWidth("pb-positif", positifPct);
+        setWidth("pb-neutral", neutralPct);
+        setWidth("pb-positive", positivePct);
         setText("pb-buzzer-neg-txt", `${s.neg_pct}%`);
         setText("pb-very-neg-txt", `${s.very_neg_pct}%`);
         setText("pb-neg-txt", `${Math.round((s.neg_pct - s.very_neg_pct) * 10) / 10}%`);
-        setText("pb-netral-txt", `${netralPct}%`);
-        setText("pb-positif-txt", `${positifPct}%`);
+        setText("pb-neutral-txt", `${neutralPct}%`);
+        setText("pb-positive-txt", `${positivePct}%`);
     }, 50));
 
     show(summarySection);
@@ -120,8 +120,8 @@ function filterResults(type, btn) {
     if (type === "buzzer-neg") filtered = allResults.filter(t => t.sentiment.level >= 2);
     if (type === "very-neg") filtered = allResults.filter(t => t.sentiment.level === 3);
     if (type === "neg") filtered = allResults.filter(t => t.sentiment.level === 2);
-    if (type === "netral") filtered = allResults.filter(t => t.sentiment.level === 1);
-    if (type === "positif") filtered = allResults.filter(t => t.sentiment.level === 0);
+    if (type === "neutral") filtered = allResults.filter(t => t.sentiment.level === 1);
+    if (type === "positive") filtered = allResults.filter(t => t.sentiment.level === 0);
 
     tweetCards.innerHTML = "";
     filtered.forEach((t, i) => tweetCards.appendChild(buildCard(t, i)));
@@ -137,9 +137,9 @@ function renderTweets(tweets) {
 function buildCard(t, index) {
     const div = document.createElement("div");
     const lvl = t.sentiment.level;
-    const isBuzzerNeg = lvl >= 2;   // Negatif atau Sangat Negatif = Buzzer Negatif
+    const isBuzzerNeg = lvl >= 2;   // Negative or Very Negative = Negative Buzzer
 
-    const levelClass = ["senti-positif", "senti-netral", "senti-neg", "senti-very-neg"][lvl] || "senti-netral";
+    const levelClass = ["senti-positive", "senti-neutral", "senti-neg", "senti-very-neg"][lvl] || "senti-neutral";
     div.className = `tweet-card ${levelClass}${isBuzzerNeg ? " is-buzzer-neg" : ""}`;
     div.style.animationDelay = `${index * 0.04}s`;
 
@@ -148,17 +148,17 @@ function buildCard(t, index) {
         ? `<img class="tc-avatar" src="${esc(t.user.profile_image)}" alt="avatar" onerror="this.style.display='none'">`
         : `<div class="tc-avatar-fallback">${esc((t.user.name[0] || "?").toUpperCase())}</div>`;
 
-    // Buzzer Negatif badge (only for negative)
+    // Negative Buzzer badge (only for negative)
     const buzzerBadge = isBuzzerNeg
-        ? `<span class="badge badge-buzzer-neg">🚨 Buzzer Negatif</span>`
+        ? `<span class="badge badge-buzzer-neg">🚨 Negative Buzzer</span>`
         : "";
 
     // Sentiment detail badge
     const sentInfo = [
-        ["🟢 Positif", "badge-positif"],
-        ["⚪ Netral", "badge-netral"],
-        ["🟠 Negatif", "badge-neg"],
-        ["🔴 Sangat Negatif", "badge-very-neg"],
+        ["🟢 Positive", "badge-positive"],
+        ["⚪ Neutral", "badge-neutral"],
+        ["🟠 Negative", "badge-neg"],
+        ["🔴 Very Negative", "badge-very-neg"],
     ][lvl];
     const sentBadge = `<span class="badge ${sentInfo[1]}">${sentInfo[0]}</span>`;
 
@@ -166,7 +166,7 @@ function buildCard(t, index) {
 
     // Confidence score badge (model-based only)
     const scoreBadge = t.sentiment.score != null
-        ? `<span class="badge badge-score">${(t.sentiment.score * 100).toFixed(1)}% yakin</span>`
+        ? `<span class="badge badge-score">${(t.sentiment.score * 100).toFixed(1)}% confident</span>`
         : "";
 
 
@@ -201,7 +201,7 @@ function buildCard(t, index) {
               ${esc(t.user.name)}
             </a>
           </div>
-          <div class="tc-handle">@${esc(t.user.screen_name)} • ${fmt(t.user.followers)} Followers</div>
+          <div class="tc-handle">@${esc(t.user.screen_name)} • ${fmt(t.user.followers)} followers</div>
         </div>
       </div>
       <div class="badges">
