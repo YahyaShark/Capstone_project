@@ -352,11 +352,11 @@ a:hover {
   background: var(--orange);
 }
 
-.bar-fill.netral {
+.bar-fill.neutral {
   background: var(--text-dim);
 }
 
-.bar-fill.positif {
+.bar-fill.positive {
   background: var(--green);
 }
 
@@ -472,12 +472,12 @@ a:hover {
   color: var(--orange);
 }
 
-.badge-netral {
+.badge-neutral {
   border-color: var(--text-dim);
   color: var(--text-dim);
 }
 
-.badge-positif {
+.badge-positive {
   border-color: var(--green);
   color: var(--green);
 }
