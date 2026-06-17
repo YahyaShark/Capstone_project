@@ -146,7 +146,7 @@ if __name__ == "__main__":
     try:
         data = run_scraper(query, auth_token, max_results)
         if not data:
-            print(json.dumps({"success": False, "error": "Token salah, atau tidak ada tweet yang didapatkan dari topik ini (Playwright gagal menarik respons)."}))
+            print(json.dumps({"success": False, "error": "Invalid token, or no tweets were retrieved from this topic (Playwright failed to pull a response))."}))
         else:
             print(json.dumps({"success": True, "data": data}))
     except Exception as e:
